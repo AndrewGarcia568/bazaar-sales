@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "Bazaar Sales System",
+  "short_name": "Bazaar Sales",
+  "description": "Offline-first sales management for bazaar products, checkout, and reports.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f1eb",
+  "theme_color": "#5a3825",
+  "icons": [
+    { "src": "./icons/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./icons/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#5a3825">
+<meta name="description" content="Offline-first Bazaar Sales app for products, checkout, and reports.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bazaar Sales">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/app-icon-192.png">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self';">
+<title>Bazaar Sales System</title>
+<script src="./vendor/xlsx-offline.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+
+:root {
+    --brown: #6f4e37;
+    --dark-brown: #5a3825;
+    --cream: #f5f1eb;
+    --border: #d8c7b8;
+    --green: #217346;
+    --red: #c9302c;
+}
+
+html { min-height: 100%; background: var(--cream); }
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--cream);
+    margin: 0;
+    padding: 0;
+    color: #333;
+    min-height: 100vh;
+}
+.app-shell { min-height: 100vh; }
+.sidebar {
+    position: fixed; inset: 0 auto 0 0; width: 244px; z-index: 50;
+    display: flex; flex-direction: column; padding: 22px 14px;
+    background: #3f2a1e; color: #fff; box-shadow: 4px 0 18px rgba(35,20,10,.12);
+}
+.brand { display:flex; align-items:center; gap:12px; padding: 8px 10px 26px; }
+.brand-mark { display:grid; place-items:center; width:42px; height:42px; border-radius:13px; background:#f2dfc8; color:#5a3825; font-size:23px; }
+.brand-title { font-weight:800; letter-spacing:.2px; font-size:17px; }
+.brand-subtitle { color:#d9c5b4; font-size:12px; margin-top:4px; }
+.nav-label { color:#bca493; font-size:10px; letter-spacing:1.5px; font-weight:800; padding: 10px 12px; }
+.sidebar-nav { display:flex; flex-direction:column; gap:6px; }
+.nav-link { display:flex; align-items:center; gap:12px; width:100%; text-align:left; border-radius:10px; padding:12px 13px; background:transparent; color:#eaded4; font-size:14px; font-weight:700; }
+.nav-link .nav-icon { width:22px; text-align:center; font-size:18px; }
+.nav-link:hover { background:rgba(255,255,255,.08); }
+.nav-link.active { background:#f5eee7; color:#5a3825; }
+.sidebar-footer { margin-top:auto; padding:14px 12px 6px; color:#c7b3a3; font-size:12px; line-height:1.5; }
+.main-content { margin-left:244px; min-width:0; padding: 28px clamp(14px, 3vw, 38px) 36px; }
+.topbar { display:flex; align-items:center; gap:12px; margin:0 auto 24px; max-width:1400px; }
+.topbar h1 { color:var(--dark-brown); font-size:clamp(22px, 2.4vw, 30px); text-align:left; margin:0; }
+.topbar p { color:#77685e; font-size:13px; margin:5px 0 0; }
+.menu-toggle { display:none; background:var(--brown); color:white; padding:10px 12px; }
+.container { max-width: 1400px; margin: auto; }
+h1, h2, h3 { color: var(--dark-brown); }
+h2 { margin-top: 0; }
+.card { background:white; padding:20px; border-radius:14px; margin-bottom:20px; box-shadow:0 3px 14px rgba(67,43,27,.06); border:1px solid rgba(111,78,55,.08); }
+.page { display:none; }
+.page.active { display:block; }
+
+button {
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: bold;
+    padding: 12px 16px;
+}
+
+button:focus-visible, input:focus-visible {
+    outline: 3px solid #b58b68;
+    outline-offset: 2px;
+}
+
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.primary-btn { background: var(--brown); color: white; }
+.primary-btn:hover { background: #543a29; }
+.success-btn { background: var(--green); color: white; }
+.danger-btn { background: #b33a3a; color: white; }
+.secondary-btn { background: #e8dfd6; color: var(--dark-brown); }
+
+.actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+}
+
+.table-container { overflow-x: auto; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    background: var(--brown);
+    color: white;
+    padding: 12px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    white-space: nowrap;
+}
+
+tbody tr:hover { background: #faf7f3; }
+
+input {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #cbbbad;
+    border-radius: 6px;
+    font: inherit;
+    min-width: 80px;
+}
+
+.product-setup-table input { min-width: 120px; }
+
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 15px 0 20px;
+}
+
+.product-btn {
+    background: var(--cream);
+    color: var(--dark-brown);
+    border: 2px solid var(--border);
+    padding: 17px 10px;
+    min-height: 75px;
+    overflow-wrap: anywhere;
+}
+
+.product-btn:hover, .product-btn.selected {
+    background: var(--brown);
+    color: white;
+    border-color: var(--brown);
+}
+
+.product-btn .product-price {
+    display: block;
+    font-size: 14px;
+    margin-top: 7px;
+    font-weight: normal;
+}
+
+.quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0 18px;
+}
+
+.quantity-btn {
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    background: var(--brown);
+    color: white;
+    font-size: 24px;
+}
+
+.quantity-value {
+    min-width: 45px;
+    text-align: center;
+    font-size: 23px;
+    font-weight: bold;
+}
+
+.price-display {
+    background: var(--cream);
+    color: var(--dark-brown);
+    border-radius: 7px;
+    padding: 14px;
+    text-align: center;
+    font-weight: bold;
+    margin-top: 15px;
+}
+
+.cart-item {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0;
+    border-bottom: 1px solid #ddd;
+}
+
+.cart-item-name { color: var(--dark-brown); font-weight: bold; }
+.cart-details { font-size: 13px; color: #666; margin-top: 5px; }
+.cart-item-total { font-weight: bold; color: var(--dark-brown); }
+.remove-btn { background: #d9534f; color: white; padding: 9px; }
+.empty-message { text-align: center; color: #777; padding: 25px; }
+
+.cart-subtotal {
+    margin-top: 15px;
+    padding: 16px;
+    background: var(--cream);
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--dark-brown);
+}
+
+.payment-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 15px 0;
+}
+
+.payment-btn { border: 2px solid; }
+.cash-payment { background: #e9f7ed; color: #287a3e; border-color: #b8dfc2; }
+.gcash-payment { background: #e8f1fb; color: #1769aa; border-color: #b8cfe8; }
+.cash-payment.selected { background: #287a3e; color: white; }
+.gcash-payment.selected { background: #1769aa; color: white; }
+
+.checkout-btn { width: 100%; background: var(--green); color: white; padding: 15px; }
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 15px;
+}
+
+.summary-box {
+    background: var(--cream);
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.summary-label { color: #666; font-size: 14px; margin-bottom: 8px; }
+.summary-value { color: var(--dark-brown); font-size: 27px; font-weight: bold; overflow-wrap: anywhere; }
+
+.payment-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.payment-box { padding: 20px 12px; border-radius: 10px; text-align: center; }
+.cash-box { background: #e9f7ed; border: 1px solid #b8dfc2; color: #287a3e; }
+.gcash-box { background: #e8f1fb; border: 1px solid #b8cfe8; color: #1769aa; }
+.grand-box { background: var(--cream); border: 1px solid #ddd; color: var(--dark-brown); }
+.payment-title { font-weight: bold; margin-bottom: 10px; }
+.payment-total { font-size: 25px; font-weight: bold; overflow-wrap: anywhere; }
+
+.cash { color: #287a3e; font-weight: bold; }
+.gcash { color: #1769aa; font-weight: bold; }
+.tally-total { font-weight: bold; background: var(--cream); }
+
+.note { color: #666; font-size: 14px; line-height: 1.5; }
+.status-message { margin-top: 12px; color: var(--dark-brown); font-size: 14px; }
+
+@media (max-width: 900px) {
+    .sidebar { width:218px; }
+    .main-content { margin-left:218px; }
+    .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .payment-summary { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+    .sidebar { width:260px; transform:translateX(-105%); transition:transform .22s ease; box-shadow:8px 0 30px rgba(0,0,0,.22); }
+    .sidebar.open { transform:translateX(0); }
+    .sidebar-backdrop { display:none; position:fixed; inset:0; background:rgba(28,18,12,.42); z-index:40; }
+    .sidebar-backdrop.show { display:block; }
+    .main-content { margin-left:0; padding: max(14px, env(safe-area-inset-top)) 12px max(24px, env(safe-area-inset-bottom)); }
+    .topbar { margin-bottom:16px; }
+    .menu-toggle { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .card { padding:15px; border-radius:12px; }
+    .product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .product-btn { min-height:78px; padding:12px 8px; }
+    .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .summary-box { padding:14px 8px; }
+    .summary-value { font-size:21px; }
+    .payment-options { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .payment-summary { grid-template-columns:1fr; gap:8px; }
+    .payment-box { padding:15px; }
+    .payment-total { font-size:22px; }
+    .cart-item { grid-template-columns:1fr auto; gap:8px; }
+    .cart-subtotal { font-size:17px; }
+    .actions button { flex:1 1 100%; }
+    button { min-height:44px; }
+    input { min-height:44px; }
+    .table-container { border-radius:8px; }
+    th,td { padding:9px 10px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior:auto !important; transition:none !important; } }
+</style>
+</head>
+
+<body>
+<div class="app-shell">
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+<aside class="sidebar" id="appSidebar" aria-label="Main navigation">
+    <div class="brand"><div class="brand-mark">▦</div><div><div class="brand-title">Bazaar Sales</div><div class="brand-subtitle">Sales management</div></div></div>
+    <div class="nav-label">WORKSPACE</div>
+    <nav class="sidebar-nav">
+        <button class="nav-link active" data-page="3" onclick="goToPage(3)"><span class="nav-icon">⌂</span>Dashboard</button>
+        <button class="nav-link" data-page="2" onclick="goToPage(2)"><span class="nav-icon">＋</span>New Sale</button>
+        <button class="nav-link" data-page="1" onclick="goToPage(1)"><span class="nav-icon">▤</span>Products</button>
+        <button class="nav-link" data-page="4" onclick="goToPage(4)"><span class="nav-icon">▣</span>Sales History</button>
+        <button class="nav-link" data-page="5" onclick="goToPage(5)"><span class="nav-icon">▥</span>Reports & Tallies</button>
+        <button class="nav-link" data-page="6" onclick="goToPage(6)"><span class="nav-icon">⚙</span>Settings</button>
+    </nav>
+    <div class="sidebar-footer">Offline-ready app<br>Data is saved on this device.</div>
+</aside>
+<main class="main-content">
+<header class="topbar">
+    <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Open navigation">☰</button>
+    <div><h1 id="viewTitle">Dashboard</h1><p id="viewSubtitle">A quick overview of your bazaar sales.</p></div>
+</header>
+<div class="container">
+
+<!-- PAGE 1: PRODUCT SETUP -->
+<section class="page active" id="page1">
+    <div class="card">
+        <h2>📋 Product Setup</h2>
+        <p class="note">
+            Enter the products you plan to sell and their selling prices.
+            These products and prices will appear as buttons on the sales page.
+            Prices are in Philippine pesos (₱).
+        </p>
+
+        <div class="table-container">
+            <table class="product-setup-table">
+                <thead>
+                    <tr>
+                        <th style="width:60px">No.</th>
+                        <th>Item Name</th>
+                        <th>Price (₱)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="productSetupBody"></tbody>
+            </table>
+        </div>
+
+        <div class="actions">
+            <button class="secondary-btn" onclick="addProductRow()">
+                ➕ Add Product Row
+            </button>
+            <button class="primary-btn" onclick="proceedToSales()">
+                Proceed to Sales →
+            </button>
+        </div>
+        <div class="status-message" id="setupMessage" role="status"></div>
+    </div>
+</section>
+
+
+<!-- ==================================================
+     PAGE 2: SALES & CART
+================================================== -->
+<section class="page" id="page2">
+    <div class="card">
+        <h2>➕ Add Sale</h2>
+        <label for="productGrid"><strong>Select Product</strong></label>
+        <div class="product-grid" id="productGrid"></div>
+
+        <label for="quantityDisplay"><strong>Quantity</strong></label>
+        <div class="quantity-controls">
+            <button class="quantity-btn" onclick="changeQuantity(-1)" aria-label="Decrease quantity">−</button>
+            <div class="quantity-value" id="quantityDisplay" aria-live="polite">1</div>
+            <button class="quantity-btn" onclick="changeQuantity(1)" aria-label="Increase quantity">+</button>
+        </div>
+
+        <button class="primary-btn" style="width:100%;padding:15px" onclick="addToCart()">
+            🛒 Add to Cart
+        </button>
+
+        <div class="price-display" id="priceDisplay">
+            Select a product to see its price.
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🛒 Cart</h2>
+        <div id="cartItems">
+            <div class="empty-message">Your cart is empty.</div>
+        </div>
+
+        <div class="cart-subtotal">
+            <span>Subtotal</span>
+            <span id="cartSubtotal">₱0.00</span>
+        </div>
+
+        <h3 style="margin-top:25px">Payment Method</h3>
+        <p class="note">The selected payment method applies to every item in this checkout.</p>
+
+        <div class="payment-options">
+            <button class="payment-btn cash-payment" id="cashButton" onclick="selectPayment('Cash')">💵 Cash</button>
+            <button class="payment-btn gcash-payment" id="gcashButton" onclick="selectPayment('GCash')">📱 GCash</button>
+        </div>
+
+        <button class="checkout-btn" onclick="checkout()">✅ Checkout Cart</button>
+    </div>
+
+    <div class="card">
+        <h2>⚙️ Manage Products</h2>
+        <p class="note">
+            Add another item and its price here. You can also return to Product Setup
+            to edit your existing products. Existing sales retain the prices recorded
+            at the time of sale.
+        </p>
+        <div class="actions">
+            <button class="secondary-btn" onclick="addProductFromSales()">➕ Add Item & Price</button>
+            <button class="secondary-btn" onclick="goToPage(1)">← Edit Product List</button>
+            <button class="success-btn" onclick="goToPage(5)">View Reports →</button>
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================
+     PAGE 3: SALES RECORDS & SUMMARIES
+================================================== -->
+<section class="page" id="page3">
+    <div class="card">
+        <h2>🧾 Sales Records</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                        <th>Mode of Payment</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="salesTable"></tbody>
+            </table>
+        </div>
+        <div class="actions">
+            <button class="success-btn" onclick="exportExcel()">📊 Export Excel</button>
+            <button class="danger-btn" onclick="clearSales()">🗑 Clear All Sales</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📈 Sales Summary</h2>
+        <div class="summary-grid">
+            <div class="summary-box">
+                <div class="summary-label">Total Sales</div>
+                <div class="summary-value" id="grandTotal">₱0.00</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-label">Total Items Sold</div>
+                <div class="summary-value" id="totalItems">0</div>
+            </div>
+        </div>
+
+        <div class="payment-summary">
+            <div class="payment-box cash-box">
+                <div class="payment-title">💵 CASH TOTAL</div>
+                <div class="payment-total" id="cashGrandTotal">₱0.00</div>
+            </div>
+            <div class="payment-box gcash-box">
+                <div class="payment-title">📱 GCASH TOTAL</div>
+                <div class="payment-total" id="gcashGrandTotal">₱0.00</div>
+            </div>
+            <div class="payment-box grand-box">
+                <div class="payment-title">TOTAL COLLECTED</div>
+                <div class="payment-total" id="combinedGrandTotal">₱0.00</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📊 Product Tally</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Items Sold</th>
+                        <th>Total Sales</th>
+                    </tr>
+                </thead>
+                <tbody id="tallyTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>💳 Payment Tally</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mode of Payment</th>
+                        <th>Transactions</th>
+                        <th>Items</th>
+                        <th>Total Collected</th>
+                    </tr>
+                </thead>
+                <tbody id="paymentTallyTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="actions" style="margin-bottom:25px">
+        <button class="secondary-btn" onclick="goToPage(2)">← Back to Sales</button>
+        <button class="secondary-btn" onclick="goToPage(1)">Edit Product Setup</button>
+    </div>
+</section>
+
+<section class="page" id="page4" aria-label="Sales History"></section>
+<section class="page" id="page5" aria-label="Reports and Tallies"></section>
+<section class="page" id="page6">
+    <div class="card">
+        <h2>⚙️ Settings</h2>
+        <p class="note">Bazaar Sales is designed to run offline after it has been installed and opened once while online. Your product list and sales records are stored locally in this browser profile on this device.</p>
+        <h3>Data and privacy</h3>
+        <ul><li>No account or cloud sync is required.</li><li>Clearing this browser's site data may erase saved products and sales.</li><li>Use <strong>Export Excel</strong> in Sales History to keep a copy of your records.</li></ul>
+        <p class="note">For a clean start, this mobile edition uses its own storage keys and begins with no products and no sales.</p>
+    </div>
+</section>
+</div>
+</main>
+</div>
+
+<script>
+
+"use strict";
+
+/* ==================================================
+   STORAGE & APPLICATION STATE
+================================================== */
+
+const PRODUCT_KEY = "bazaarSalesMobileProductsV1";
+const SALES_KEY = "bazaarSalesMobileSalesV1";
+
+let products = loadJSON(PRODUCT_KEY, []);
+
+let sales = loadJSON(SALES_KEY, []);
+let cart = [];
+let selectedProductId = null;
+let selectedPayment = "";
+let quantity = 1;
+
+let nextProductId =
+    Math.max(0, ...products.map(p => Number(p.id) || 0)) + 1;
+
+function loadJSON(key, fallback) {
+    try {
+        const value = JSON.parse(localStorage.getItem(key));
+        return Array.isArray(value) ? value : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function saveProducts() {
+    localStorage.setItem(PRODUCT_KEY, JSON.stringify(products));
+}
+
+function saveSales() {
+    localStorage.setItem(SALES_KEY, JSON.stringify(sales));
+}
+
+function money(value) {
+    return "₱" + (Number(value) || 0).toFixed(2);
+}
+
+function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[char]);
+}
+
+/* ==================================================
+   PAGE NAVIGATION
+================================================== */
+
+function goToPage(pageNumber) {
+    if (pageNumber === 2 && products.length === 0) {
+        alert("Please add at least one product in Products first.");
+        pageNumber = 1;
+    }
+
+    document.querySelectorAll(".page").forEach(page => page.classList.remove("active"));
+    const target = document.getElementById("page" + pageNumber);
+    if (target) target.classList.add("active");
+
+    document.querySelectorAll(".nav-link").forEach(link => {
+        link.classList.toggle("active", Number(link.dataset.page) === pageNumber);
+    });
+
+    const titles = {
+        1: ["Products", "Manage the products and prices you sell."],
+        2: ["New Sale", "Add products to the cart and check out."],
+        3: ["Dashboard", "A quick overview of your bazaar sales."],
+        4: ["Sales History", "Review transactions and export your records."],
+        5: ["Reports & Tallies", "See product totals and payment breakdowns."],
+        6: ["Settings", "Manage local data and app information."]
+    };
+    const [title, subtitle] = titles[pageNumber] || titles[3];
+    document.getElementById("viewTitle").textContent = title;
+    document.getElementById("viewSubtitle").textContent = subtitle;
+
+    if (pageNumber === 1) renderProductSetup();
+    if (pageNumber === 2) renderProductButtons();
+    if ([3, 4, 5].includes(pageNumber)) refreshSummaries();
+    closeSidebar();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function organizeViews() {
+    const dashboard = document.getElementById("page3");
+    const history = document.getElementById("page4");
+    const reports = document.getElementById("page5");
+    const cards = Array.from(dashboard.querySelectorAll(":scope > .card"));
+    // Keep summary metrics on Dashboard; separate transaction history and reports.
+    if (cards[0]) history.appendChild(cards[0]);
+    if (cards[2]) reports.appendChild(cards[2]);
+    if (cards[3]) reports.appendChild(cards[3]);
+    const oldActions = dashboard.querySelector(":scope > .actions");
+    if (oldActions) dashboard.appendChild(oldActions);
+}
+
+function toggleSidebar() {
+    document.getElementById("appSidebar").classList.toggle("open");
+    document.getElementById("sidebarBackdrop").classList.toggle("show");
+}
+function closeSidebar() {
+    document.getElementById("appSidebar").classList.remove("open");
+    document.getElementById("sidebarBackdrop").classList.remove("show");
+}
+
+
+/* ==================================================
+   PAGE 1: PRODUCT SETUP TABLE
+================================================== */
+
+function renderProductSetup() {
+    const body = document.getElementById("productSetupBody");
+    body.innerHTML = "";
+
+    if (products.length === 0) {
+        addProductRow();
+        return;
+    }
+
+    products.forEach(product => {
+        appendProductRow(product.name, product.price, product.id);
+    });
+}
+
+function appendProductRow(name = "", price = "", id = "") {
+    const body = document.getElementById("productSetupBody");
+    const row = document.createElement("tr");
+
+    row.dataset.id = id;
+
+    row.innerHTML = `
+        <td class="row-number"></td>
+        <td>
+            <input
+                type="text"
+                class="setup-name"
+                placeholder="Item name"
+                value="${escapeHTML(name)}"
+                maxlength="100"
+                aria-label="Item name"
+            >
+        </td>
+        <td>
+            <input
+                type="number"
+                class="setup-price"
+                placeholder="0.00"
+                min="0.01"
+                step="0.01"
+                value="${price === "" ? "" : escapeHTML(price)}"
+                aria-label="Selling price"
+            >
+        </td>
+        <td>
+            <button
+                type="button"
+                class="danger-btn"
+                onclick="removeProductRow(this)"
+            >Remove</button>
+        </td>
+    `;
+
+    body.appendChild(row);
+    updateRowNumbers();
+}
+
+function addProductRow() {
+    appendProductRow();
+
+    const inputs = document.querySelectorAll(".setup-name");
+
+    if (inputs.length) {
+        inputs[inputs.length - 1].focus();
+    }
+}
+
+function removeProductRow(button) {
+    button.closest("tr").remove();
+    updateRowNumbers();
+}
+
+function updateRowNumbers() {
+    document.querySelectorAll("#productSetupBody tr")
+        .forEach((row, index) => {
+            row.querySelector(".row-number").textContent = index + 1;
+        });
+}
+
+function readSetupRows() {
+    const rows = [
+        ...document.querySelectorAll("#productSetupBody tr")
+    ];
+
+    const result = [];
+    const names = new Set();
+
+    for (const row of rows) {
+        const name = row.querySelector(".setup-name").value.trim();
+        const rawPrice = row.querySelector(".setup-price").value;
+
+        if (!name && rawPrice === "") {
+            continue;
+        }
+
+        if (!name) {
+            alert("Please enter an item name for every row with a price.");
+            row.querySelector(".setup-name").focus();
+            return null;
+        }
+
+        const price = Number(rawPrice);
+
+        if (
+            rawPrice === "" ||
+            !Number.isFinite(price) ||
+            price <= 0
+        ) {
+            alert(
+                "Please enter a valid price greater than ₱0.00 for " +
+                name + "."
+            );
+
+            row.querySelector(".setup-price").focus();
+            return null;
+        }
+
+        const key = name.toLowerCase();
+
+        if (names.has(key)) {
+            alert(
+                'The product "' + name +
+                '" appears more than once. Please use unique item names.'
+            );
+
+            row.querySelector(".setup-name").focus();
+            return null;
+        }
+
+        names.add(key);
+
+        const existingId = Number(row.dataset.id);
+
+        result.push({
+            id:
+                Number.isFinite(existingId) && existingId > 0
+                    ? existingId
+                    : nextProductId++,
+
+            name: name,
+
+            price: Math.round(price * 100) / 100
+        });
+    }
+
+    if (result.length === 0) {
+        alert("Please enter at least one product and its price.");
+        return null;
+    }
+
+    return result;
+}
+
+function proceedToSales() {
+    const updatedProducts = readSetupRows();
+
+    if (!updatedProducts) {
+        return;
+    }
+
+    products = updatedProducts;
+
+    nextProductId = Math.max(
+        nextProductId,
+        ...products.map(p => p.id + 1)
+    );
+
+    saveProducts();
+
+    // Remove cart items whose products were removed from the list.
+    cart = cart.filter(item =>
+        products.some(p => p.id === item.productId)
+    );
+
+    if (
+        selectedProductId !== null &&
+        !products.some(p => p.id === selectedProductId)
+    ) {
+        selectedProductId = null;
+    }
+
+    renderCart();
+    renderProductButtons();
+    goToPage(2);
+}
+
+/* ==================================================
+   ADD PRODUCT FROM PAGE 2
+================================================== */
+
+function addProductFromSales() {
+    const nameInput = prompt("Enter the new item name:");
+
+    if (nameInput === null) {
+        return;
+    }
+
+    const name = nameInput.trim();
+
+    if (!name) {
+        alert("Item name cannot be empty.");
+        return;
+    }
+
+    if (
+        products.some(
+            p => p.name.toLowerCase() === name.toLowerCase()
+        )
+    ) {
+        alert("A product with that name already exists.");
+        return;
+    }
+
+    const priceInput = prompt(
+        "Enter the selling price for " + name + " (₱):"
+    );
+
+    if (priceInput === null) {
+        return;
+    }
+
+    const price = Number(priceInput);
+
+    if (
+        priceInput.trim() === "" ||
+        !Number.isFinite(price) ||
+        price <= 0
+    ) {
+        alert("Please enter a valid price greater than ₱0.00.");
+        return;
+    }
+
+    products.push({
+        id: nextProductId++,
+        name: name,
+        price: Math.round(price * 100) / 100
+    });
+
+    saveProducts();
+    renderProductButtons();
+
+    alert(name + " has been added to your product list.");
+}
+
+/* ==================================================
+   PAGE 2: PRODUCT BUTTONS & ADD SALE
+================================================== */
+
+function renderProductButtons() {
+    const grid = document.getElementById("productGrid");
+    grid.innerHTML = "";
+
+    if (products.length === 0) {
+        grid.innerHTML =
+            '<div class="empty-message">' +
+            'No products configured. Return to Product Setup.' +
+            '</div>';
+
+        updatePriceDisplay();
+        return;
+    }
+
+    products.forEach(product => {
+        const button = document.createElement("button");
+
+        button.type = "button";
+
+        button.className =
+            "product-btn" +
+            (selectedProductId === product.id ? " selected" : "");
+
+        button.innerHTML = `
+            ${escapeHTML(product.name)}
+            <span class="product-price">
+                ${money(product.price)}
+            </span>
+        `;
+
+        button.onclick = () => selectProduct(product.id);
+
+        grid.appendChild(button);
+    });
+
+    updatePriceDisplay();
+}
+
+function selectProduct(id) {
+    selectedProductId = id;
+
+    renderProductButtons();
+    updatePriceDisplay();
+}
+
+function changeQuantity(amount) {
+    quantity = Math.max(1, quantity + amount);
+
+    document.getElementById("quantityDisplay").textContent = quantity;
+
+    updatePriceDisplay();
+}
+
+function updatePriceDisplay() {
+    const product = products.find(
+        p => p.id === selectedProductId
+    );
+
+    const display = document.getElementById("priceDisplay");
+
+    if (!product) {
+        display.textContent = "Select a product to see its price.";
+        return;
+    }
+
+    display.textContent =
+        `${product.name} • ${money(product.price)} each • ` +
+        `${quantity} item(s) = ${money(product.price * quantity)}`;
+}
+
+function addToCart() {
+    const product = products.find(
+        p => p.id === selectedProductId
+    );
+
+    if (!product) {
+        alert("Please select a product.");
+        return;
+    }
+
+    const existing = cart.find(item =>
+        item.productId === product.id &&
+        item.price === product.price
+    );
+
+    if (existing) {
+        existing.quantity += quantity;
+
+        existing.total = Math.round(
+            existing.quantity * existing.price * 100
+        ) / 100;
+
+    } else {
+        cart.push({
+            productId: product.id,
+            product: product.name,
+            quantity: quantity,
+            price: product.price,
+            total: Math.round(
+                quantity * product.price * 100
+            ) / 100
+        });
+    }
+
+    selectedProductId = null;
+    quantity = 1;
+
+    document.getElementById("quantityDisplay").textContent = "1";
+
+    renderProductButtons();
+    renderCart();
+}
+
+/* ==================================================
+   CART
+================================================== */
+
+function renderCart() {
+    const container = document.getElementById("cartItems");
+
+    container.innerHTML = "";
+
+    if (cart.length === 0) {
+        container.innerHTML =
+            '<div class="empty-message">Your cart is empty.</div>';
+
+        document.getElementById("cartSubtotal").textContent = money(0);
+        return;
+    }
+
+    cart.forEach((item, index) => {
+        const row = document.createElement("div");
+
+        row.className = "cart-item";
+
+        row.innerHTML = `
+            <div>
+                <div class="cart-item-name">
+                    ${escapeHTML(item.product)}
+                </div>
+                <div class="cart-details">
+                    ${money(item.price)} each
+                </div>
+            </div>
+
+            <div>Qty: ${item.quantity}</div>
+
+            <div class="cart-item-total">
+                ${money(item.total)}
+            </div>
+
+            <div>
+                <button
+                    class="remove-btn"
+                    onclick="removeFromCart(${index})"
+                >Remove</button>
+            </div>
+        `;
+
+        container.appendChild(row);
+    });
+
+    document.getElementById("cartSubtotal").textContent =
+        money(getCartSubtotal());
+}
+
+function getCartSubtotal() {
+    return cart.reduce(
+        (sum, item) => sum + Number(item.total || 0),
+        0
+    );
+}
+
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    renderCart();
+}
+
+function selectPayment(payment) {
+    selectedPayment = payment;
+
+    document.getElementById("cashButton")
+        .classList.toggle("selected", payment === "Cash");
+
+    document.getElementById("gcashButton")
+        .classList.toggle("selected", payment === "GCash");
+}
+
+/* ==================================================
+   CHECKOUT
+================================================== */
+
+function checkout() {
+    if (cart.length === 0) {
+        alert("Your cart is empty.");
+        return;
+    }
+
+    if (!selectedPayment) {
+        alert("Please select Cash or GCash.");
+        return;
+    }
+
+    const subtotal = getCartSubtotal();
+
+    const confirmed = confirm(
+        `Checkout ${cart.length} cart line(s) for ` +
+        `${money(subtotal)} using ${selectedPayment}?`
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const date = new Date().toLocaleString();
+
+    cart.forEach(item => {
+        sales.push({
+            id:
+                (typeof crypto !== "undefined" && crypto.randomUUID)
+                    ? crypto.randomUUID()
+                    : String(Date.now()) + "-" + Math.random(),
+
+            date: date,
+            product: item.product,
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.price,
+            total: Math.round(item.total * 100) / 100,
+            payment: selectedPayment
+        });
+    });
+
+    saveSales();
+
+    cart = [];
+    selectedPayment = "";
+
+    document.getElementById("cashButton")
+        .classList.remove("selected");
+
+    document.getElementById("gcashButton")
+        .classList.remove("selected");
+
+    renderCart();
+
+    alert("Checkout completed successfully.");
+}
+
+/* ==================================================
+   END OF PART 3
+   PART 4 CONTINUES BELOW THIS LINE
+================================================== */
+
+/* ==================================================
+   PAGE 3: SALES RECORDS
+================================================== */
+
+function displaySales() {
+    const table = document.getElementById("salesTable");
+    table.innerHTML = "";
+
+    if (sales.length === 0) {
+        table.innerHTML = `
+            <tr>
+                <td colspan="7" class="empty-message">
+                    No sales recorded yet.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    sales.forEach((sale, index) => {
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td>${escapeHTML(sale.date)}</td>
+            <td>${escapeHTML(sale.product)}</td>
+            <td>${Number(sale.quantity) || 0}</td>
+            <td>${money(sale.price)}</td>
+            <td>${money(sale.total)}</td>
+            <td class="${sale.payment === "Cash" ? "cash-color" : "gcash-color"}">
+                ${escapeHTML(sale.payment)}
+            </td>
+            <td>
+                <button class="danger-btn" onclick="deleteSale(${index})">
+                    Delete
+                </button>
+            </td>
+        `;
+
+        table.appendChild(row);
+    });
+}
+
+/* ==================================================
+   SALES SUMMARY
+================================================== */
+
+function updateSummary() {
+    let totalSales = 0;
+    let totalItems = 0;
+    let cashTotal = 0;
+    let gcashTotal = 0;
+
+    sales.forEach(sale => {
+        const total = Number(sale.total) || 0;
+        const qty = Number(sale.quantity) || 0;
+
+        totalSales += total;
+        totalItems += qty;
+
+        if (sale.payment === "Cash") {
+            cashTotal += total;
+        } else if (sale.payment === "GCash") {
+            gcashTotal += total;
+        }
+    });
+
+    document.getElementById("grandTotal").textContent =
+        money(totalSales);
+
+    document.getElementById("totalItems").textContent =
+        totalItems;
+
+    document.getElementById("cashGrandTotal").textContent =
+        money(cashTotal);
+
+    document.getElementById("gcashGrandTotal").textContent =
+        money(gcashTotal);
+
+    document.getElementById("combinedGrandTotal").textContent =
+        money(cashTotal + gcashTotal);
+}
+
+/* ==================================================
+   PRODUCT TALLY
+================================================== */
+
+function updateProductTally() {
+    const table = document.getElementById("tallyTable");
+    table.innerHTML = "";
+
+    const tally = new Map();
+
+    products.forEach(product => {
+        tally.set(product.name, {
+            quantity: 0,
+            total: 0
+        });
+    });
+
+    // Include historical products even if they were removed
+    // from the current product setup.
+    sales.forEach(sale => {
+        if (!tally.has(sale.product)) {
+            tally.set(sale.product, {
+                quantity: 0,
+                total: 0
+            });
+        }
+
+        const item = tally.get(sale.product);
+        item.quantity += Number(sale.quantity) || 0;
+        item.total += Number(sale.total) || 0;
+    });
+
+    let grandQuantity = 0;
+    let grandSales = 0;
+
+    tally.forEach((item, product) => {
+        grandQuantity += item.quantity;
+        grandSales += item.total;
+
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td>${escapeHTML(product)}</td>
+            <td>${item.quantity}</td>
+            <td>${money(item.total)}</td>
+        `;
+
+        table.appendChild(row);
+    });
+
+    const totalRow = document.createElement("tr");
+    totalRow.className = "tally-total";
+
+    totalRow.innerHTML = `
+        <td>GRAND TOTAL</td>
+        <td>${grandQuantity}</td>
+        <td>${money(grandSales)}</td>
+    `;
+
+    table.appendChild(totalRow);
+}
+
+/* ==================================================
+   PAYMENT TALLY
+================================================== */
+
+function updatePaymentTally() {
+    const stats = {
+        Cash: {
+            transactions: 0,
+            items: 0,
+            total: 0
+        },
+        GCash: {
+            transactions: 0,
+            items: 0,
+            total: 0
+        }
+    };
+
+    sales.forEach(sale => {
+        if (!stats[sale.payment]) {
+            return;
+        }
+
+        const payment = stats[sale.payment];
+
+        payment.transactions++;
+        payment.items += Number(sale.quantity) || 0;
+        payment.total += Number(sale.total) || 0;
+    });
+
+    const cash = stats.Cash;
+    const gcash = stats.GCash;
+
+    const allTransactions =
+        cash.transactions + gcash.transactions;
+
+    const allItems =
+        cash.items + gcash.items;
+
+    const allSales =
+        cash.total + gcash.total;
+
+    document.getElementById("paymentTallyTable").innerHTML = `
+        <tr>
+            <td class="cash-color">Cash</td>
+            <td>${cash.transactions}</td>
+            <td>${cash.items}</td>
+            <td>${money(cash.total)}</td>
+        </tr>
+
+        <tr>
+            <td class="gcash-color">GCash</td>
+            <td>${gcash.transactions}</td>
+            <td>${gcash.items}</td>
+            <td>${money(gcash.total)}</td>
+        </tr>
+
+        <tr class="tally-total">
+            <td>TOTAL</td>
+            <td>${allTransactions}</td>
+            <td>${allItems}</td>
+            <td>${money(allSales)}</td>
+        </tr>
+    `;
+}
+
+/* ==================================================
+   REFRESH PAGE 3
+================================================== */
+
+function refreshSummaries() {
+    displaySales();
+    updateSummary();
+    updateProductTally();
+    updatePaymentTally();
+}
+
+/* ==================================================
+   DELETE ONE SALE
+================================================== */
+
+function deleteSale(index) {
+    if (!sales[index]) {
+        return;
+    }
+
+    if (!confirm("Are you sure you want to delete this sale?")) {
+        return;
+    }
+
+    sales.splice(index, 1);
+
+    saveSales();
+    refreshSummaries();
+}
+
+/* ==================================================
+   CLEAR ALL SALES
+================================================== */
+
+function clearSales() {
+    if (sales.length === 0) {
+        alert("There are no sales to clear.");
+        return;
+    }
+
+    if (!confirm(
+        "Are you sure you want to delete ALL sales? This cannot be undone."
+    )) {
+        return;
+    }
+
+    sales = [];
+
+    saveSales();
+    refreshSummaries();
+
+    alert("All sales records have been cleared.");
+}
+
+/* ==================================================
+   EXPORT EXCEL
+================================================== */
+
+function exportExcel() {
+    if (sales.length === 0) {
+        alert("There are no sales to export.");
+        return;
+    }
+
+    if (typeof XLSX === "undefined") {
+        alert(
+            "The Excel library could not load. " +
+            "Please reload the app. The offline Excel component did not load."
+        );
+        return;
+    }
+
+    const totalItems = sales.reduce(
+        (sum, sale) => sum + (Number(sale.quantity) || 0),
+        0
+    );
+
+    const grandTotal = sales.reduce(
+        (sum, sale) => sum + (Number(sale.total) || 0),
+        0
+    );
+
+    const cashSales = sales.filter(
+        sale => sale.payment === "Cash"
+    );
+
+    const gcashSales = sales.filter(
+        sale => sale.payment === "GCash"
+    );
+
+    function summarize(list) {
+        return {
+            transactions: list.length,
+            items: list.reduce(
+                (sum, sale) => sum + (Number(sale.quantity) || 0),
+                0
+            ),
+            total: list.reduce(
+                (sum, sale) => sum + (Number(sale.total) || 0),
+                0
+            )
+        };
+    }
+
+    const cash = summarize(cashSales);
+    const gcash = summarize(gcashSales);
+
+    /* WORKSHEET 1: SALES RECORDS */
+
+    const salesData = sales.map(sale => ({
+        "Date & Time": sale.date,
+        "Product": sale.product,
+        "Quantity": Number(sale.quantity),
+        "Unit Price": Number(sale.price),
+        "Total": Number(sale.total),
+        "Mode of Payment": sale.payment
+    }));
+
+    salesData.push({
+        "Date & Time": "",
+        "Product": "GRAND TOTAL",
+        "Quantity": totalItems,
+        "Unit Price": "",
+        "Total": grandTotal,
+        "Mode of Payment": ""
+    });
+
+    const salesSheet = XLSX.utils.json_to_sheet(salesData);
+
+    salesSheet["!cols"] = [
+        { wch: 24 },
+        { wch: 25 },
+        { wch: 12 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 20 }
+    ];
+
+    /* WORKSHEET 2: PRODUCT TALLY */
+
+    const productNames = new Set(products.map(p => p.name));
+
+    sales.forEach(sale => productNames.add(sale.product));
+
+    const productData = [];
+
+    productNames.forEach(name => {
+        const matchingSales = sales.filter(
+            sale => sale.product === name
+        );
+
+        const qty = matchingSales.reduce(
+            (sum, sale) => sum + (Number(sale.quantity) || 0),
+            0
+        );
+
+        const total = matchingSales.reduce(
+            (sum, sale) => sum + (Number(sale.total) || 0),
+            0
+        );
+
+        productData.push({
+            "Product": name,
+            "Items Sold": qty,
+            "Total Sales": total
+        });
+    });
+
+    productData.push({
+        "Product": "GRAND TOTAL",
+        "Items Sold": totalItems,
+        "Total Sales": grandTotal
+    });
+
+    const productSheet = XLSX.utils.json_to_sheet(productData);
+
+    productSheet["!cols"] = [
+        { wch: 28 },
+        { wch: 15 },
+        { wch: 18 }
+    ];
+
+    /* WORKSHEET 3: PAYMENT TALLY */
+
+    const paymentData = [
+        {
+            "Mode of Payment": "Cash",
+            "Transactions": cash.transactions,
+            "Items Sold": cash.items,
+            "Total Collected": cash.total
+        },
+        {
+            "Mode of Payment": "GCash",
+            "Transactions": gcash.transactions,
+            "Items Sold": gcash.items,
+            "Total Collected": gcash.total
+        },
+        {
+            "Mode of Payment": "GRAND TOTAL",
+            "Transactions": cash.transactions + gcash.transactions,
+            "Items Sold": totalItems,
+            "Total Collected": grandTotal
+        }
+    ];
+
+    const paymentSheet = XLSX.utils.json_to_sheet(paymentData);
+
+    paymentSheet["!cols"] = [
+        { wch: 22 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 20 }
+    ];
+
+    /* WORKSHEET 4: SUMMARY */
+
+    const summaryData = [
+        { "Metric": "TOTAL SALES", "Amount": grandTotal },
+        { "Metric": "TOTAL ITEMS SOLD", "Amount": totalItems },
+        { "Metric": "TOTAL TRANSACTIONS", "Amount": sales.length },
+        { "Metric": "CASH TOTAL", "Amount": cash.total },
+        { "Metric": "GCASH TOTAL", "Amount": gcash.total },
+        { "Metric": "TOTAL COLLECTED", "Amount": cash.total + gcash.total }
+    ];
+
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+
+    summarySheet["!cols"] = [
+        { wch: 26 },
+        { wch: 20 }
+    ];
+
+    /* WORKSHEET 5: CURRENT PRODUCT LIST */
+
+    const currentProducts = products.map(product => ({
+        "Product": product.name,
+        "Selling Price": product.price
+    }));
+
+    const setupSheet = XLSX.utils.json_to_sheet(currentProducts);
+
+    setupSheet["!cols"] = [
+        { wch: 28 },
+        { wch: 18 }
+    ];
+
+    /* CREATE EXCEL WORKBOOK */
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, salesSheet, "Sales Records");
+    XLSX.utils.book_append_sheet(workbook, productSheet, "Product Tally");
+    XLSX.utils.book_append_sheet(workbook, paymentSheet, "Payment Tally");
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Sales Summary");
+    XLSX.utils.book_append_sheet(workbook, setupSheet, "Product List");
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    XLSX.writeFile(
+        workbook,
+        `bazaar-sales-${today}.xlsx`
+    );
+}
+
+/* ==================================================
+   INITIALIZE APPLICATION
+================================================== */
+
+function initializeApp() {
+    organizeViews();
+    renderProductSetup();
+    renderProductButtons();
+    renderCart();
+    refreshSummaries();
+    goToPage(3);
+}
+
+initializeApp();
+
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
+}
+
+
+</script>
+</body>
+</html>
+
