@@ -270,6 +270,20 @@ input {
 .note { color: #666; font-size: 14px; line-height: 1.5; }
 .status-message { margin-top: 12px; color: var(--dark-brown); font-size: 14px; }
 
+/* App-owned dialogs: avoid browser dialogs branded with the site URL. */
+.dialog-backdrop { position:fixed; inset:0; z-index:200; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(24,16,11,.52); }
+.dialog-backdrop.open { display:flex; }
+.app-dialog { width:min(100%, 440px); background:#fff; border-radius:16px; padding:22px; box-shadow:0 18px 60px rgba(0,0,0,.28); border:1px solid #e3d5c9; }
+.app-dialog h2 { margin:0 0 10px; font-size:21px; }
+.app-dialog-message { color:#5e5148; line-height:1.5; white-space:pre-line; margin:0 0 16px; }
+.app-dialog input { margin:0 0 16px; }
+.dialog-actions { display:flex; justify-content:flex-end; gap:9px; flex-wrap:wrap; }
+.dialog-actions button { min-width:94px; }
+.dialog-cancel { background:#eee5dc; color:#503725; }
+.dialog-confirm { background:var(--brown); color:white; }
+.dialog-confirm.danger { background:var(--red); }
+@media (max-width: 480px) { .app-dialog { padding:18px; } .dialog-actions button { flex:1; } }
+
 @media (max-width: 900px) {
     .sidebar { width:218px; }
     .main-content { margin-left:218px; }
@@ -439,10 +453,10 @@ input {
                 <thead>
                     <tr>
                         <th>Date & Time</th>
-                        <th>Product</th>
-                        <th>Quantity</th>
-                        <th>Unit Price</th>
-                        <th>Total</th>
+                        <th>Customer</th>
+                        <th>Products in Transaction</th>
+                        <th>Total Quantity</th>
+                        <th>Transaction Total</th>
                         <th>Mode of Payment</th>
                         <th>Action</th>
                     </tr>
@@ -539,6 +553,15 @@ input {
 </main>
 </div>
 
+<div class="dialog-backdrop" id="appDialogBackdrop" role="presentation">
+  <section class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage">
+    <h2 id="appDialogTitle">Bazaar Sales</h2>
+    <p class="app-dialog-message" id="appDialogMessage"></p>
+    <input id="appDialogInput" type="text" autocomplete="off" hidden>
+    <div class="dialog-actions" id="appDialogActions"></div>
+  </section>
+</div>
+
 <script>
 
 "use strict";
@@ -593,12 +616,124 @@ function escapeHTML(value) {
 }
 
 /* ==================================================
+   CUSTOM APP DIALOGS & TRANSACTION HELPERS
+================================================== */
+let activeDialogCleanup = null;
+
+function showDialog({ title = "Bazaar Sales", message = "", type = "notice", value = "", inputType = "text", placeholder = "", required = false, confirmLabel = "OK", danger = false } = {}) {
+    const backdrop = document.getElementById("appDialogBackdrop");
+    const titleEl = document.getElementById("appDialogTitle");
+    const messageEl = document.getElementById("appDialogMessage");
+    const input = document.getElementById("appDialogInput");
+    const actions = document.getElementById("appDialogActions");
+    if (activeDialogCleanup) activeDialogCleanup();
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    input.hidden = type !== "prompt";
+    input.type = inputType;
+    input.value = value;
+    input.placeholder = placeholder;
+    input.required = required;
+    input.setAttribute("aria-label", title);
+    actions.replaceChildren();
+
+    return new Promise(resolve => {
+        let settled = false;
+        const finish = result => {
+            if (settled) return;
+            settled = true;
+            backdrop.classList.remove("open");
+            document.removeEventListener("keydown", onKeyDown);
+            backdrop.removeEventListener("click", onBackdropClick);
+            input.removeEventListener("keydown", onInputKeyDown);
+            activeDialogCleanup = null;
+            resolve(result);
+        };
+        const addButton = (label, className, result, isDefault = false) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = label;
+            button.className = className;
+            button.addEventListener("click", () => {
+                if (type === "prompt" && result !== null && required && !input.value.trim()) {
+                    input.setCustomValidity("Please fill out this field.");
+                    input.reportValidity();
+                    return;
+                }
+                input.setCustomValidity("");
+                finish(type === "prompt" && result !== null ? input.value : result);
+            });
+            actions.appendChild(button);
+            if (isDefault) button.dataset.default = "true";
+        };
+        if (type === "confirm" || type === "prompt") addButton("Cancel", "dialog-cancel", null);
+        addButton(confirmLabel, "dialog-confirm" + (danger ? " danger" : ""), type === "confirm" ? true : type === "prompt" ? input.value : true, true);
+
+        const onKeyDown = event => {
+            if (event.key === "Escape") { event.preventDefault(); finish(null); }
+            if (event.key === "Enter" && type !== "notice" && document.activeElement !== actions.querySelector("button.dialog-cancel")) {
+                event.preventDefault();
+                actions.querySelector("button[data-default='true']")?.click();
+            }
+        };
+        const onInputKeyDown = event => {
+            if (event.key === "Enter") { event.preventDefault(); actions.querySelector("button[data-default='true']")?.click(); }
+        };
+        const onBackdropClick = event => { if (event.target === backdrop && type !== "prompt") finish(type === "confirm" ? null : true); };
+        document.addEventListener("keydown", onKeyDown);
+        backdrop.addEventListener("click", onBackdropClick);
+        input.addEventListener("keydown", onInputKeyDown);
+        activeDialogCleanup = () => finish(null);
+        backdrop.classList.add("open");
+        if (type === "prompt") { input.focus(); input.select(); }
+        else actions.querySelector("button[data-default='true']")?.focus();
+    });
+}
+
+function appAlert(message, title = "Bazaar Sales") {
+    return showDialog({ title, message: String(message), type: "notice", confirmLabel: "OK" });
+}
+function appConfirm(message, title = "Please Confirm", danger = false) {
+    return showDialog({ title, message: String(message), type: "confirm", confirmLabel: "Confirm", danger });
+}
+function appPrompt(message, options = {}) {
+    return showDialog({ title: options.title || "Bazaar Sales", message: String(message), type: "prompt", value: options.value || "", inputType: options.inputType || "text", placeholder: options.placeholder || "", required: !!options.required, confirmLabel: options.confirmLabel || "Continue" });
+}
+
+function getTransactions() {
+    const grouped = new Map();
+    sales.forEach((sale, index) => {
+        // Old records without transactionId remain visible as individual records.
+        const key = sale.transactionId || `legacy-${sale.id || index}`;
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                id: key,
+                date: sale.date || "",
+                customerName: sale.customerName || "—",
+                payment: sale.payment || "",
+                items: [],
+                total: 0,
+                quantity: 0
+            });
+        }
+        const transaction = grouped.get(key);
+        transaction.items.push(sale);
+        transaction.total += Number(sale.total) || 0;
+        transaction.quantity += Number(sale.quantity) || 0;
+        if (sale.customerName) transaction.customerName = sale.customerName;
+        if (sale.date && (!transaction.date || sale.date < transaction.date)) transaction.date = sale.date;
+    });
+    return [...grouped.values()].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
+/* ==================================================
    PAGE NAVIGATION
 ================================================== */
 
 function goToPage(pageNumber) {
     if (pageNumber === 2 && products.length === 0) {
-        alert("Please add at least one product in Products first.");
+        appAlert("Please add at least one product in Products first.");
         pageNumber = 1;
     }
 
@@ -751,7 +886,7 @@ function readSetupRows() {
         }
 
         if (!name) {
-            alert("Please enter an item name for every row with a price.");
+            appAlert("Please enter an item name for every row with a price.");
             row.querySelector(".setup-name").focus();
             return null;
         }
@@ -763,7 +898,7 @@ function readSetupRows() {
             !Number.isFinite(price) ||
             price <= 0
         ) {
-            alert(
+            appAlert(
                 "Please enter a valid price greater than ₱0.00 for " +
                 name + "."
             );
@@ -775,7 +910,7 @@ function readSetupRows() {
         const key = name.toLowerCase();
 
         if (names.has(key)) {
-            alert(
+            appAlert(
                 'The product "' + name +
                 '" appears more than once. Please use unique item names.'
             );
@@ -801,7 +936,7 @@ function readSetupRows() {
     }
 
     if (result.length === 0) {
-        alert("Please enter at least one product and its price.");
+        appAlert("Please enter at least one product and its price.");
         return null;
     }
 
@@ -845,8 +980,8 @@ function proceedToSales() {
    ADD PRODUCT FROM PAGE 2
 ================================================== */
 
-function addProductFromSales() {
-    const nameInput = prompt("Enter the new item name:");
+async function addProductFromSales() {
+    const nameInput = await appPrompt("Enter the new item name:", { title: "Add Product", placeholder: "Product name", confirmLabel: "Next" });
 
     if (nameInput === null) {
         return;
@@ -855,7 +990,7 @@ function addProductFromSales() {
     const name = nameInput.trim();
 
     if (!name) {
-        alert("Item name cannot be empty.");
+        appAlert("Item name cannot be empty.");
         return;
     }
 
@@ -864,12 +999,13 @@ function addProductFromSales() {
             p => p.name.toLowerCase() === name.toLowerCase()
         )
     ) {
-        alert("A product with that name already exists.");
+        appAlert("A product with that name already exists.");
         return;
     }
 
-    const priceInput = prompt(
-        "Enter the selling price for " + name + " (₱):"
+    const priceInput = await appPrompt(
+        "Enter the selling price for " + name + " (₱):",
+        { title: "Set Product Price", inputType: "number", placeholder: "0.00", confirmLabel: "Add Product" }
     );
 
     if (priceInput === null) {
@@ -883,7 +1019,7 @@ function addProductFromSales() {
         !Number.isFinite(price) ||
         price <= 0
     ) {
-        alert("Please enter a valid price greater than ₱0.00.");
+        appAlert("Please enter a valid price greater than ₱0.00.");
         return;
     }
 
@@ -896,7 +1032,7 @@ function addProductFromSales() {
     saveProducts();
     renderProductButtons();
 
-    alert(name + " has been added to your product list.");
+    appAlert(name + " has been added to your product list.");
 }
 
 /* ==================================================
@@ -979,7 +1115,7 @@ function addToCart() {
     );
 
     if (!product) {
-        alert("Please select a product.");
+        appAlert("Please select a product.");
         return;
     }
 
@@ -1095,38 +1231,51 @@ function selectPayment(payment) {
    CHECKOUT
 ================================================== */
 
-function checkout() {
+async function checkout() {
     if (cart.length === 0) {
-        alert("Your cart is empty.");
+        appAlert("Your cart is empty.");
         return;
     }
 
     if (!selectedPayment) {
-        alert("Please select Cash or GCash.");
+        appAlert("Please select Cash or GCash.");
+        return;
+    }
+
+    const customerNameValue = await appPrompt("Enter the customer's name for this transaction.", {
+        title: "Customer Details",
+        placeholder: "Customer name",
+        required: true,
+        confirmLabel: "Continue"
+    });
+    if (customerNameValue === null) return;
+    const customerName = customerNameValue.trim();
+    if (!customerName) {
+        appAlert("Please enter a customer name.");
         return;
     }
 
     const subtotal = getCartSubtotal();
-
-    const confirmed = confirm(
-        `Checkout ${cart.length} cart line(s) for ` +
-        `${money(subtotal)} using ${selectedPayment}?`
+    const confirmed = await appConfirm(
+        `Complete this transaction for ${customerName}?\n\n` +
+        `${cart.length} cart line(s) · ${money(subtotal)} · ${selectedPayment}`,
+        "Confirm Checkout"
     );
-
-    if (!confirmed) {
-        return;
-    }
+    if (!confirmed) return;
 
     const date = new Date().toLocaleString();
+    const transactionId = (typeof crypto !== "undefined" && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : String(Date.now()) + "-" + Math.random().toString(16).slice(2);
 
     cart.forEach(item => {
         sales.push({
-            id:
-                (typeof crypto !== "undefined" && crypto.randomUUID)
-                    ? crypto.randomUUID()
-                    : String(Date.now()) + "-" + Math.random(),
-
-            date: date,
+            id: (typeof crypto !== "undefined" && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : String(Date.now()) + "-" + Math.random(),
+            transactionId,
+            customerName,
+            date,
             product: item.product,
             productId: item.productId,
             quantity: item.quantity,
@@ -1137,19 +1286,13 @@ function checkout() {
     });
 
     saveSales();
-
     cart = [];
     selectedPayment = "";
-
-    document.getElementById("cashButton")
-        .classList.remove("selected");
-
-    document.getElementById("gcashButton")
-        .classList.remove("selected");
-
+    document.getElementById("cashButton").classList.remove("selected");
+    document.getElementById("gcashButton").classList.remove("selected");
     renderCart();
-
-    alert("Checkout completed successfully.");
+    refreshSummaries();
+    appAlert("Checkout completed successfully.", "Sale Complete");
 }
 
 /* ==================================================
@@ -1164,37 +1307,27 @@ function checkout() {
 function displaySales() {
     const table = document.getElementById("salesTable");
     table.innerHTML = "";
+    const transactions = getTransactions();
 
-    if (sales.length === 0) {
-        table.innerHTML = `
-            <tr>
-                <td colspan="7" class="empty-message">
-                    No sales recorded yet.
-                </td>
-            </tr>
-        `;
+    if (transactions.length === 0) {
+        table.innerHTML = `<tr><td colspan="7" class="empty-message">No sales recorded yet.</td></tr>`;
         return;
     }
 
-    sales.forEach((sale, index) => {
+    transactions.forEach((transaction, index) => {
         const row = document.createElement("tr");
-
+        const productSummary = transaction.items.map(item =>
+            `${item.product} × ${Number(item.quantity) || 0}`
+        ).join(", ");
         row.innerHTML = `
-            <td>${escapeHTML(sale.date)}</td>
-            <td>${escapeHTML(sale.product)}</td>
-            <td>${Number(sale.quantity) || 0}</td>
-            <td>${money(sale.price)}</td>
-            <td>${money(sale.total)}</td>
-            <td class="${sale.payment === "Cash" ? "cash-color" : "gcash-color"}">
-                ${escapeHTML(sale.payment)}
-            </td>
-            <td>
-                <button class="danger-btn" onclick="deleteSale(${index})">
-                    Delete
-                </button>
-            </td>
+            <td>${escapeHTML(transaction.date)}</td>
+            <td>${escapeHTML(transaction.customerName)}</td>
+            <td style="white-space:normal;min-width:180px">${escapeHTML(productSummary)}</td>
+            <td>${transaction.quantity}</td>
+            <td><strong>${money(transaction.total)}</strong></td>
+            <td class="${transaction.payment === "Cash" ? "cash-color" : "gcash-color"}">${escapeHTML(transaction.payment)}</td>
+            <td><button class="danger-btn" onclick="deleteSale(${index})">Delete</button></td>
         `;
-
         table.appendChild(row);
     });
 }
@@ -1320,15 +1453,13 @@ function updatePaymentTally() {
     };
 
     sales.forEach(sale => {
-        if (!stats[sale.payment]) {
-            return;
-        }
-
+        if (!stats[sale.payment]) return;
         const payment = stats[sale.payment];
-
-        payment.transactions++;
         payment.items += Number(sale.quantity) || 0;
         payment.total += Number(sale.total) || 0;
+    });
+    getTransactions().forEach(transaction => {
+        if (stats[transaction.payment]) stats[transaction.payment].transactions++;
     });
 
     const cash = stats.Cash;
@@ -1382,17 +1513,22 @@ function refreshSummaries() {
    DELETE ONE SALE
 ================================================== */
 
-function deleteSale(index) {
-    if (!sales[index]) {
-        return;
-    }
+async function deleteSale(transactionIndex) {
+    const transaction = getTransactions()[Number(transactionIndex)];
+    const transactionId = transaction?.id;
+    if (!transaction) return;
 
-    if (!confirm("Are you sure you want to delete this sale?")) {
-        return;
-    }
+    const confirmed = await appConfirm(
+        `Delete the transaction for ${transaction.customerName} totaling ${money(transaction.total)}? This cannot be undone.`,
+        "Delete Transaction",
+        true
+    );
+    if (!confirmed) return;
 
-    sales.splice(index, 1);
-
+    sales = sales.filter((sale, index) => {
+        const key = sale.transactionId || `legacy-${sale.id || index}`;
+        return key !== transactionId;
+    });
     saveSales();
     refreshSummaries();
 }
@@ -1401,14 +1537,16 @@ function deleteSale(index) {
    CLEAR ALL SALES
 ================================================== */
 
-function clearSales() {
+async function clearSales() {
     if (sales.length === 0) {
-        alert("There are no sales to clear.");
+        appAlert("There are no sales to clear.");
         return;
     }
 
-    if (!confirm(
-        "Are you sure you want to delete ALL sales? This cannot be undone."
+    if (!await appConfirm(
+        "Are you sure you want to delete ALL sales? This cannot be undone.",
+        "Clear All Sales",
+        true
     )) {
         return;
     }
@@ -1418,7 +1556,7 @@ function clearSales() {
     saveSales();
     refreshSummaries();
 
-    alert("All sales records have been cleared.");
+    appAlert("All sales records have been cleared.");
 }
 
 /* ==================================================
@@ -1427,12 +1565,12 @@ function clearSales() {
 
 function exportExcel() {
     if (sales.length === 0) {
-        alert("There are no sales to export.");
+        appAlert("There are no sales to export.");
         return;
     }
 
     if (typeof XLSX === "undefined") {
-        alert(
+        appAlert(
             "The Excel library could not load. " +
             "Please reload the app. The offline Excel component did not load."
         );
@@ -1458,51 +1596,41 @@ function exportExcel() {
     );
 
     function summarize(list) {
+        const selected = new Set(list.map((sale, index) => sale.transactionId || `legacy-${sale.id || index}`));
         return {
-            transactions: list.length,
-            items: list.reduce(
-                (sum, sale) => sum + (Number(sale.quantity) || 0),
-                0
-            ),
-            total: list.reduce(
-                (sum, sale) => sum + (Number(sale.total) || 0),
-                0
-            )
+            transactions: getTransactions().filter(transaction => selected.has(transaction.id)).length,
+            items: list.reduce((sum, sale) => sum + (Number(sale.quantity) || 0), 0),
+            total: list.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0)
         };
     }
 
     const cash = summarize(cashSales);
     const gcash = summarize(gcashSales);
 
-    /* WORKSHEET 1: SALES RECORDS */
-
-    const salesData = sales.map(sale => ({
-        "Date & Time": sale.date,
-        "Product": sale.product,
-        "Quantity": Number(sale.quantity),
-        "Unit Price": Number(sale.price),
-        "Total": Number(sale.total),
-        "Mode of Payment": sale.payment
+    /* WORKSHEET 1: ONE ROW PER CHECKOUT TRANSACTION */
+    const transactions = getTransactions();
+    const salesData = transactions.map(transaction => ({
+        "Date & Time": transaction.date,
+        "Customer": transaction.customerName,
+        "Products": transaction.items.map(item => `${item.product} x ${Number(item.quantity) || 0}`).join(", "),
+        "Total Quantity": transaction.quantity,
+        "Transaction Total": Math.round(transaction.total * 100) / 100,
+        "Mode of Payment": transaction.payment
     }));
 
     salesData.push({
         "Date & Time": "",
-        "Product": "GRAND TOTAL",
-        "Quantity": totalItems,
-        "Unit Price": "",
-        "Total": grandTotal,
+        "Customer": "GRAND TOTAL",
+        "Products": "",
+        "Total Quantity": totalItems,
+        "Transaction Total": grandTotal,
         "Mode of Payment": ""
     });
 
     const salesSheet = XLSX.utils.json_to_sheet(salesData);
-
     salesSheet["!cols"] = [
-        { wch: 24 },
-        { wch: 25 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 20 }
+        { wch: 24 }, { wch: 24 }, { wch: 48 },
+        { wch: 15 }, { wch: 20 }, { wch: 20 }
     ];
 
     /* WORKSHEET 2: PRODUCT TALLY */
@@ -1586,7 +1714,7 @@ function exportExcel() {
     const summaryData = [
         { "Metric": "TOTAL SALES", "Amount": grandTotal },
         { "Metric": "TOTAL ITEMS SOLD", "Amount": totalItems },
-        { "Metric": "TOTAL TRANSACTIONS", "Amount": sales.length },
+        { "Metric": "TOTAL TRANSACTIONS", "Amount": getTransactions().length },
         { "Metric": "CASH TOTAL", "Amount": cash.total },
         { "Metric": "GCASH TOTAL", "Amount": gcash.total },
         { "Metric": "TOTAL COLLECTED", "Amount": cash.total + gcash.total }
