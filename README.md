@@ -6,6 +6,7 @@ This edition adapts the Bazaar Sales system for phones and tablets. It uses a pe
 
 - Product setup and editing
 - Product selection, quantities, cart, Cash and GCash checkout
+- Increase or decrease each cart line quantity directly with plus/minus controls; quantities cannot go below one (use Remove to delete a line)
 - Sales history, deleting individual sales, and clearing sales
 - Dashboard totals, product tally, and payment tally
 - Five-sheet Excel export
@@ -52,7 +53,7 @@ Then visit `http://localhost:8080` on that computer. Localhost is treated as a s
 
 ## Storage notes
 
-This mobile PWA uses new storage keys (`bazaarSalesMobileProductsV1` and `bazaarSalesMobileSalesV1`), so it starts with an empty product list and no sales and does not reuse the prior desktop/browser data. Browser site-data clearing can erase the records. Keep regular Excel exports. If you publish an updated version, change `CACHE_NAME` in `service-worker.js` so installed clients fetch the new app files.
+This mobile PWA uses new storage keys (`bazaarSalesMobileProductsV1` and `bazaarSalesMobileSalesV1`), so it starts with an empty product list and no sales and does not reuse the prior desktop/browser data. Browser site-data clearing can erase the records. Keep regular Excel exports. If you publish an updated version, change `CACHE_NAME` in `service-worker.js` so installed clients fetch the new app files. The current package uses `bazaar-sales-mobile-v3` to refresh the cache for the cart quantity controls.
 
 ## Scope / packaging note
 

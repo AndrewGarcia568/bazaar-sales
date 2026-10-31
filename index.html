@@ -202,6 +202,9 @@ input {
 .cart-item-name { color: var(--dark-brown); font-weight: bold; }
 .cart-details { font-size: 13px; color: #666; margin-top: 5px; }
 .cart-item-total { font-weight: bold; color: var(--dark-brown); }
+.cart-qty-controls { display:flex; align-items:center; justify-content:center; gap:8px; }
+.cart-qty-btn { width:36px; height:36px; min-height:36px; padding:0; border-radius:7px; background:var(--brown); color:#fff; font-size:21px; line-height:1; }
+.cart-qty-value { min-width:24px; text-align:center; font-weight:700; font-size:16px; }
 .remove-btn { background: #d9534f; color: white; padding: 9px; }
 .empty-message { text-align: center; color: #777; padding: 25px; }
 
@@ -308,7 +311,9 @@ input {
     .payment-summary { grid-template-columns:1fr; gap:8px; }
     .payment-box { padding:15px; }
     .payment-total { font-size:22px; }
-    .cart-item { grid-template-columns:1fr auto; gap:8px; }
+    .cart-item { grid-template-columns:minmax(0,1fr) auto; gap:10px 8px; }
+    .cart-qty-controls { justify-content:flex-end; }
+    .cart-item-total { text-align:right; }
     .cart-subtotal { font-size:17px; }
     .actions button { flex:1 1 100%; }
     button { min-height:44px; }
@@ -1184,7 +1189,15 @@ function renderCart() {
                 </div>
             </div>
 
-            <div>Qty: ${item.quantity}</div>
+            <div class="cart-qty-controls" aria-label="Change quantity for ${escapeHTML(item.product)}">
+                <button class="cart-qty-btn" type="button"
+                    onclick="updateCartQuantity(${index}, -1)"
+                    aria-label="Decrease ${escapeHTML(item.product)} quantity">−</button>
+                <span class="cart-qty-value" aria-live="polite">${item.quantity}</span>
+                <button class="cart-qty-btn" type="button"
+                    onclick="updateCartQuantity(${index}, 1)"
+                    aria-label="Increase ${escapeHTML(item.product)} quantity">+</button>
+            </div>
 
             <div class="cart-item-total">
                 ${money(item.total)}
@@ -1210,6 +1223,21 @@ function getCartSubtotal() {
         (sum, item) => sum + Number(item.total || 0),
         0
     );
+}
+
+function updateCartQuantity(index, change) {
+    const item = cart[index];
+    if (!item) return;
+
+    const nextQuantity = Number(item.quantity) + Number(change);
+    // Keep cart quantities at one or more; use Remove to delete a line.
+    if (nextQuantity < 1) return;
+
+    item.quantity = nextQuantity;
+    item.total = Math.round(
+        item.quantity * Number(item.price) * 100
+    ) / 100;
+    renderCart();
 }
 
 function removeFromCart(index) {

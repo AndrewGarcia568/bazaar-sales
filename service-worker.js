@@ -1,4 +1,4 @@
-const CACHE_NAME = "bazaar-sales-mobile-v2";
+const CACHE_NAME = "bazaar-sales-mobile-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
